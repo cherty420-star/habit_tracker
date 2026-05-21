@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  db:
+    image: postgres:15-alpine
+    container_name: habit_tracker_db
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME:-habit_tracker}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - habit_network
+
+  # Redis для Celery
+  redis:
+    image: redis:7-alpine
+    container_name: habit_tracker_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - habit_network
+
+  # Django приложение
+  web:
+    build: .
+    container_name: habit_tracker_web
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn habit_tracker.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - habit_network
+
+  # Celery worker
+  celery:
+    build: .
+    container_name: habit_tracker_celery
+    restart: unless-stopped
+    command: >
+      sh -c "/wait-for-it.sh db:5432 -- 
+             celery -A habit_tracker worker --loglevel=info --pool=solo"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - habit_network
+
+  # Celery beat
+  celery-beat:
+    build: .
+    container_name: habit_tracker_celery_beat
+    restart: unless-stopped
+    command: >
+      sh -c "/wait-for-it.sh db:5432 -- 
+             celery -A habit_tracker beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - habit_network
+
+  # Telegram бот
+  bot:
+    build: .
+    container_name: habit_tracker_bot
+    restart: unless-stopped
+    command: >
+      sh -c "/wait-for-it.sh db:5432 -- 
+             python telegram_bot/bot.py"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - web
+    networks:
+      - habit_network
+
+networks:
+  habit_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:

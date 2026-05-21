@@ -1,39 +1,46 @@
+# Docker
+.env
+postgres_data/
+redis_data/
+staticfiles/
+media/
+
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-env/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
 venv/
 .venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Django
-*.log
-*.pot
-*.pyc
-local_settings.py
-db.sqlite3
-media/
-staticfiles/
+env/
+.env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 .DS_Store
 
-# Environment variables
-.env
+# Database
+db.sqlite3
+*.db
+
+# Logs
+*.log
 
 # Celery
 celerybeat-schedule
 celerybeat.pid
+*.pid
 
 # Testing
 .coverage
