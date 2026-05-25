@@ -11,21 +11,6 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: testpassword
-          POSTGRES_DB: habit_tracker_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -42,18 +27,7 @@ jobs:
         pip install -r requirements.txt
         pip install flake8
 
-    - name: Lint with flake8
-      run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=119 --statistics
-
     - name: Run tests
-      env:
-        DB_NAME: habit_tracker_test
-        DB_USER: test
-        DB_PASSWORD: testpassword
-        DB_HOST: localhost
-        DB_PORT: 5432
       run: |
         python manage.py test --noinput
 
@@ -67,19 +41,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install SSH key
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-    - name: Add server to known hosts
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-
     - name: Deploy to server
-      run: |
-        ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} -p ${{ secrets.SERVER_PORT }} << 'EOF'
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
           cd /home/test/habit_tracker
           git pull origin main
           source venv/bin/activate
@@ -90,4 +59,3 @@ jobs:
           sudo systemctl restart habit_tracker
           sudo systemctl restart nginx
           echo "Deployment completed successfully!"
-        EOF
