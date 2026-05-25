@@ -11,6 +11,21 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: habit_tracker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -28,6 +43,12 @@ jobs:
         pip install flake8
 
     - name: Run tests
+      env:
+        DB_NAME: habit_tracker_test
+        DB_USER: test
+        DB_PASSWORD: testpassword
+        DB_HOST: localhost
+        DB_PORT: 5432
       run: |
         python manage.py test --noinput
 
