@@ -34,3 +34,6 @@ git clone <repository-url>
 cd habit_tracker
 
 Сервер доступен по адресу: http://111.88.152.165
+
+
+hi
